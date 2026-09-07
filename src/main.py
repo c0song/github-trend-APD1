@@ -193,32 +193,45 @@ def translate_batch(texts):
 
 
 def send_discord_message(repos, category):
-    """단일 웹후크로 카테고리 테마 임베드를 전송합니다. DRY_RUN=1이면 출력만 합니다."""
+    """단일 웹후크로 [헤더 임베드 + 저장소 카드 임베드(GitHub OG 미리보기 이미지)]를 전송합니다.
+    DRY_RUN=1이면 출력만 합니다."""
     descs = translate_batch([r["desc"] for r in repos])
 
     now = datetime.now(KST)
-    fields = []
-    for idx, (repo, desc) in enumerate(zip(repos, descs), 1):
-        value = f"⭐️ {repo['stars']} · 🍴 {repo['forks']}\n{desc}\n[GitHub에서 보기]({repo['link']})"
-        if len(value) > 1024:
-            value = value[:1021] + "..."
-        fields.append({"name": f"{idx}. {repo['name']}", "value": value})
+    color = THEME_COLORS.get(category["key"], 0x95A5A6)
 
-    embed = {
+    header = {
         "title": f"{category['emoji']} 오늘의 {category['label']} 트렌드",
         "description": f"GitHub Daily Trending · {now.strftime('%Y-%m-%d')} ({WEEKDAY_NAMES[now.weekday()]})",
-        "color": THEME_COLORS.get(category["key"], 0x95A5A6),
-        "fields": fields,
+        "color": color,
         "footer": {"text": "GitHub Trend Bot"},
         "timestamp": now.isoformat(),
     }
 
+    # 캐시키 자리에 날짜를 넣어 이미지가 매일 갱신되게 합니다.
+    og_date = now.strftime("%Y%m%d")
+    cards = []
+    for idx, (repo, desc) in enumerate(zip(repos, descs), 1):
+        desc_line = f"⭐️ {repo['stars']} · 🍴 {repo['forks']}\n{desc}"
+        if len(desc_line) > 4096:
+            desc_line = desc_line[:4093] + "..."
+        cards.append({
+            "title": f"{idx}. {repo['name']}",
+            "url": repo["link"],
+            "description": desc_line,
+            "image": {"url": f"https://opengraph.githubassets.com/{og_date}/{repo['name']}"},
+            "color": color,
+        })
+
+    embeds = [header] + cards
+
     if os.environ.get("DRY_RUN") == "1":
-        print(f"[DRY RUN] [{category['label']}] 임베드 미리보기:")
-        print(f"# {embed['title']}  |  {embed['description']}  |  color=#{embed['color']:06x}")
-        for f in fields:
-            print(f"**{f['name']}**")
-            print(f["value"])
+        print(f"[DRY RUN] [{category['label']}] 임베드 {len(embeds)}개 미리보기:")
+        print(f"# {header['title']}  |  {header['description']}  |  color=#{color:06x}")
+        for c in cards:
+            print(f"**{c['title']}** → {c['url']}")
+            print(f"{c['description']}")
+            print(f"🖼️ {c['image']['url']}")
             print()
         return
 
@@ -227,9 +240,9 @@ def send_discord_message(repos, category):
         print(f"⚠️ [{category['label']}] 전송 실패: WEBHOOK_URL이 설정되지 않았습니다.")
         return
 
-    resp = requests.post(webhook_url, json={"embeds": [embed]})
+    resp = requests.post(webhook_url, json={"embeds": embeds})
     if resp.status_code in (200, 204):
-        print(f"✅ [{category['label']}] 전송 완료")
+        print(f"✅ [{category['label']}] 전송 완료 (헤더+{len(cards)}카드)")
     else:
         print(f"⚠️ [{category['label']}] 전송 실패: HTTP {resp.status_code} {resp.text[:200]}")
     time.sleep(1)
