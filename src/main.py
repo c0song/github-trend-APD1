@@ -162,16 +162,21 @@ def translate_batch(texts):
             + numbered
         )
         parsed = None
-        for model in ("gemini-2.5-flash", "gemini-2.0-flash"):
+        for model in ("gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"):
             try:
+                body = {"contents": [{"parts": [{"text": prompt}]}]}
+                if "2.5" in model:
+                    # thinking 모드 지연 방지: 추론 없이 즉답 모드로 호출합니다.
+                    body["generationConfig"] = {"thinkingConfig": {"thinkingBudget": 0}}
                 resp = requests.post(
                     f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
                     params={"key": GEMINI_API_KEY},
-                    json={"contents": [{"parts": [{"text": prompt}]}]},
-                    timeout=30,
+                    json=body,
+                    timeout=60,
                 )
                 if resp.status_code == 404:
-                    continue  # 모델 없음 → 다음 후보
+                    print(f"⚠️ [{model}] 모델 없음(404) → 다음 후보")
+                    continue
                 resp.raise_for_status()
                 out = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
                 by_num = {}
