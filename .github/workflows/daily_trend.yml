@@ -1,9 +1,19 @@
-name: Daily 5 Languages Trend
+name: Daily Tech Trend
 
 on:
   schedule:
-    - cron: '0 3 * * *'
+    # 평일 12:00 KST (UTC 03:00)
+    - cron: '0 3 * * 1-5'
   workflow_dispatch:
+    inputs:
+      trend_category:
+        description: '테마 강제 지정 (ai/frontend/backend/db/ml/all) — 비우면 오늘 요일 테마'
+        required: false
+        default: ''
+      dry_run:
+        description: 'true면 채널에 전송하지 않고 메시지 미리보기만 출력'
+        required: false
+        default: 'false'
 
 jobs:
   run-bot:
@@ -21,11 +31,8 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: 봇 실행
-        # 여기에 5개의 시크릿을 모두 매핑합니다
         env:
-          WEBHOOK_PYTHON: ${{ secrets.WEBHOOK_PYTHON }}
-          WEBHOOK_JAVASCRIPT: ${{ secrets.WEBHOOK_JAVASCRIPT }}
-          WEBHOOK_TYPESCRIPT: ${{ secrets.WEBHOOK_TYPESCRIPT }}
-          WEBHOOK_JAVA: ${{ secrets.WEBHOOK_JAVA }}
-          WEBHOOK_KOTLIN: ${{ secrets.WEBHOOK_KOTLIN }}
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          TREND_CATEGORY: ${{ inputs.trend_category }}
+          DRY_RUN: ${{ inputs.dry_run == 'true' && '1' || '' }}
         run: python src/main.py
