@@ -43,6 +43,16 @@ CATEGORIES = {
 }
 KST = timezone(timedelta(hours=9))
 WEEKDAY_NAMES = ["월", "화", "수", "목", "금", "토", "일"]
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# 요일 테마별 임베드 좌측 색상
+THEME_COLORS = {
+    "agents": 0x9B59B6,
+    "frontend": 0xF1C40F,
+    "backend": 0x3498DB,
+    "ml": 0x2ECC71,
+    "llm": 0x1ABC9C,
+}
 
 # 키워드 정규식 미리 컴파일. \b 단어 경계로 'html' 안의 'ml' 같은 오매칭을 방지합니다.
 for _cat in CATEGORIES.values():
@@ -119,13 +129,17 @@ def filter_by_category(pool, category):
     return matched
 
 
+def has_hangul(s):
+    return any('가' <= ch <= '힣' for ch in (s or ""))
+
+
 def to_korean(text):
     """Google 번역은 에러를 던지지 않고 에러 페이지 텍스트를 반환할 때가 있어,
     결과에 한글이 있는지 확인하고 실패 시 원문(영문)을 유지합니다."""
     for _ in range(2):
         try:
             ko = GoogleTranslator(source='auto', target='ko').translate(text)
-            if any('가' <= ch <= '힣' for ch in (ko or "")):
+            if has_hangul(ko):
                 return ko
         except Exception:
             pass
@@ -133,18 +147,79 @@ def to_korean(text):
     return text
 
 
+def translate_batch(texts):
+    """Gemini 무료 API로 설명을 일괄 번역합니다. 키가 없거나 실패하면
+    GoogleTranslator 개별 번역으로, 그것도 실패하면 원문으로 폴백합니다."""
+    if not texts:
+        return []
+
+    if GEMINI_API_KEY:
+        numbered = "\n".join(f"{i}. {t}" for i, t in enumerate(texts, 1))
+        prompt = (
+            "다음은 GitHub 인기 저장소 설명 목록입니다. 각 항목을 개발자가 읽기 자연스러운 한국어로 번역하세요.\n"
+            "규칙: 제품명과 기술 용어(MCP, RAG, LLM, 디퓨전 등)는 원래 널리 쓰이는 표현을 유지하고, "
+            "설명이 비어 있으면 '설명 없음'으로 출력하며, 마크다운 없이 '1. 번역문' 형식으로 한 줄씩만 출력하세요.\n\n"
+            + numbered
+        )
+        parsed = None
+        for model in ("gemini-2.5-flash", "gemini-2.0-flash"):
+            try:
+                resp = requests.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                    params={"key": GEMINI_API_KEY},
+                    json={"contents": [{"parts": [{"text": prompt}]}]},
+                    timeout=30,
+                )
+                if resp.status_code == 404:
+                    continue  # 모델 없음 → 다음 후보
+                resp.raise_for_status()
+                out = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+                by_num = {}
+                for line in out.splitlines():
+                    m = re.match(r"\s*(\d+)[.)]\s*(.+)", line)
+                    if m:
+                        by_num[int(m.group(1))] = m.group(2).strip().strip('*').strip()
+                parsed = [by_num.get(i, "") for i in range(1, len(texts) + 1)]
+                break
+            except Exception as e:
+                print(f"⚠️ [{model}] Gemini 번역 실패: {e}")
+        if parsed:
+            final = [r if has_hangul(r) else to_korean(t) for r, t in zip(parsed, texts)]
+            print(f"🌐 Gemini 번역 {sum(1 for r in final if has_hangul(r))}/{len(texts)} 적용")
+            return final
+
+    print("🌐 GoogleTranslator 사용")
+    return [to_korean(t) for t in texts]
+
+
 def send_discord_message(repos, category):
-    """단일 웹후크로 카테고리 테마 메시지를 전송합니다. DRY_RUN=1이면 출력만 합니다."""
+    """단일 웹후크로 카테고리 테마 임베드를 전송합니다. DRY_RUN=1이면 출력만 합니다."""
+    descs = translate_batch([r["desc"] for r in repos])
+
     now = datetime.now(KST)
-    content = f"## {category['emoji']} 오늘의 {category['label']} 트렌드 ({now.strftime('%Y-%m-%d')} {WEEKDAY_NAMES[now.weekday()]})\n"
-    for idx, repo in enumerate(repos, 1):
-        content += f"**{idx}. {repo['name']}** (⭐️`{repo['stars']}` | 🍴`{repo['forks']}`)\n"
-        content += f"> {to_korean(repo['desc'])}\n"
-        content += f"- <{repo['link']}>\n\n"
+    fields = []
+    for idx, (repo, desc) in enumerate(zip(repos, descs), 1):
+        value = f"⭐️ {repo['stars']} · 🍴 {repo['forks']}\n{desc}\n[GitHub에서 보기]({repo['link']})"
+        if len(value) > 1024:
+            value = value[:1021] + "..."
+        fields.append({"name": f"{idx}. {repo['name']}", "value": value})
+
+    embed = {
+        "title": f"{category['emoji']} 오늘의 {category['label']} 트렌드",
+        "description": f"GitHub Daily Trending · {now.strftime('%Y-%m-%d')} ({WEEKDAY_NAMES[now.weekday()]})",
+        "color": THEME_COLORS.get(category["key"], 0x95A5A6),
+        "fields": fields,
+        "footer": {"text": "GitHub Trend Bot"},
+        "timestamp": now.isoformat(),
+    }
 
     if os.environ.get("DRY_RUN") == "1":
-        print(f"[DRY RUN] [{category['label']}] 메시지 미리보기:")
-        print(content)
+        print(f"[DRY RUN] [{category['label']}] 임베드 미리보기:")
+        print(f"# {embed['title']}  |  {embed['description']}  |  color=#{embed['color']:06x}")
+        for f in fields:
+            print(f"**{f['name']}**")
+            print(f["value"])
+            print()
         return
 
     webhook_url = os.environ.get("WEBHOOK_URL")
@@ -152,8 +227,11 @@ def send_discord_message(repos, category):
         print(f"⚠️ [{category['label']}] 전송 실패: WEBHOOK_URL이 설정되지 않았습니다.")
         return
 
-    requests.post(webhook_url, json={"content": content})
-    print(f"✅ [{category['label']}] 전송 완료")
+    resp = requests.post(webhook_url, json={"embeds": [embed]})
+    if resp.status_code in (200, 204):
+        print(f"✅ [{category['label']}] 전송 완료")
+    else:
+        print(f"⚠️ [{category['label']}] 전송 실패: HTTP {resp.status_code} {resp.text[:200]}")
     time.sleep(1)
 
 if __name__ == "__main__":

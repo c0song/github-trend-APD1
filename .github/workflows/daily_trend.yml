@@ -33,6 +33,7 @@ jobs:
       - name: 봇 실행
         env:
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TREND_CATEGORY: ${{ inputs.trend_category }}
           DRY_RUN: ${{ inputs.dry_run == 'true' && '1' || '' }}
         run: python src/main.py
