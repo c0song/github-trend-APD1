@@ -2,8 +2,8 @@ name: Daily Tech Trend
 
 on:
   schedule:
-    # 평일 12:00 KST (UTC 03:00)
-    - cron: '0 3 * * 1-5'
+    # 평일 09:00 KST (UTC 00:00) — 액션 큐 지연이 적은 시간대
+    - cron: '0 0 * * 1-5'
   workflow_dispatch:
     inputs:
       trend_category:
