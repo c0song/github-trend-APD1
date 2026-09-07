@@ -16,14 +16,14 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
 # 저장소 이름+설명에서 키워드로 해당 카테고리에 맞는 저장소만 걸러냅니다.
 CATEGORIES = {
     0: {
-        "key": "ai", "label": "AI SKILL", "emoji": "🤖",
+        "key": "agents", "label": "AI 에이전트·MCP", "emoji": "🧩",
         "languages": ["python", "typescript", "rust"],
-        "keywords": ["claude", "claude-code", "mcp", "anthropic", "agent", "llm", "openai", "gpt", "gemini", "copilot", "prompt", "chatbot", "rag"],
+        "keywords": ["claude", "claude-code", "mcp", "anthropic", "agent", "agents", "skill", "skills", "langchain", "autogen", "crewai", "a2a"],
     },
     1: {
         "key": "frontend", "label": "프론트엔드", "emoji": "🎨",
         "languages": ["javascript", "typescript"],
-        "keywords": ["react", "vue", "next.js", "nextjs", "nuxt", "svelte", "astro", "angular", "tailwind", "css", "vite", "frontend", "front-end", "ui", "component", "web", "browser", "user interface", "remix"],
+        "keywords": ["react", "vue", "next.js", "nextjs", "nuxt", "svelte", "astro", "angular", "tailwind", "css", "vite", "frontend", "front-end", "ui", "component", "web", "browser", "user interface", "remix", "react native", "react-native", "expo", "flutter"],
     },
     2: {
         "key": "backend", "label": "백엔드", "emoji": "⚙️",
@@ -31,14 +31,14 @@ CATEGORIES = {
         "keywords": ["fastapi", "node", "nodejs", "express", "nest", "django", "flask", "api", "backend", "server", "microservice", "graphql", "grpc"],
     },
     3: {
-        "key": "db", "label": "데이터베이스", "emoji": "🗄️",
+        "key": "ml", "label": "머신러닝·DB", "emoji": "🧠",
         "languages": ["python", "rust", "go", "c++"],
-        "keywords": ["postgres", "sql", "database", "sqlite", "redis", "mongo", "duckdb", "supabase", "vector", "nosql", "orm", "migration", "mysql", "clickhouse", "influxdb"],
+        "keywords": ["machine learning", "deep learning", "pytorch", "tensorflow", "transformer", "diffusion", "neural", "dataset", "training", "vision", "nlp", "reinforcement", "yolo", "postgres", "sql", "database", "sqlite", "redis", "mongo", "duckdb", "supabase", "vector", "nosql", "orm", "migration", "mysql", "clickhouse", "influxdb"],
     },
     4: {
-        "key": "ml", "label": "머신러닝", "emoji": "🧠",
-        "languages": ["python"],
-        "keywords": ["machine learning", "deep learning", "pytorch", "tensorflow", "transformer", "diffusion", "neural", "dataset", "training", "inference", "vision", "nlp", "reinforcement", "yolo"],
+        "key": "llm", "label": "LLM 인프라·로컬 LLM", "emoji": "⚡",
+        "languages": ["python", "rust"],
+        "keywords": ["llm", "inference", "vllm", "ollama", "quantization", "fine-tuning", "finetune", "serving", "embedding", "weights", "gguf", "lora", "rag"],
     },
 }
 KST = timezone(timedelta(hours=9))
@@ -50,7 +50,7 @@ for _cat in CATEGORIES.values():
 
 
 def select_categories():
-    """실행 대상 카테고리를 고릅니다. TREND_CATEGORY(ai/frontend/backend/db/ml/all)로
+    """실행 대상 카테고리를 고릅니다. TREND_CATEGORY(agents/frontend/backend/ml/llm/all)로
     오늘 요일과 무관하게 강제 지정할 수 있습니다."""
     override = os.environ.get("TREND_CATEGORY", "").strip().lower()
     if override:

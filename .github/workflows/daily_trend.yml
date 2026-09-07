@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       trend_category:
-        description: '테마 강제 지정 (ai/frontend/backend/db/ml/all) — 비우면 오늘 요일 테마'
+        description: '테마 강제 지정 (agents/frontend/backend/ml/llm/all) — 비우면 오늘 요일 테마'
         required: false
         default: ''
       dry_run:
