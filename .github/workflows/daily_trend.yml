@@ -2,8 +2,8 @@ name: Daily Tech Trend
 
 on:
   schedule:
-    # 평일 09:00 KST (UTC 00:00) — 액션 큐 지연이 적은 시간대
-    - cron: '0 0 * * 1-5'
+    # 평일 08:30 KST (UTC 23:30) — GitHub cron은 UTC 기준이라 전날로 지정하므로 요일은 일~목(0-4)
+    - cron: '30 23 * * 0-4'
   workflow_dispatch:
     inputs:
       trend_category:
